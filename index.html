@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📝 امتحان طاقة الوضع وفرق الجهد والمكثفات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        body.en-mode { font-family: 'Inter', sans-serif; }
+        .correct { background-color: #dcfce7 !important; border-color: #16a34a !important; }
+        .incorrect { background-color: #fee2e2 !important; border-color: #dc2626 !important; }
+        .formula { font-family: 'Times New Roman', serif; direction: ltr; display: inline-block; font-style: italic; }
+        .timer-warning { color: #dc2626 !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { opacity: 0.7; } }
+        @media print { 
+            .no-print { display: none !important; } 
+            body { background: white; color: black; }
+            .answer-box { display: block !important; color: #166534 !important; }
+            #results-panel { display: block !important; box-shadow: none; border: 2px solid #000; }
+            svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .bg-gray-50 { background-color: #f9fafb !important; }
+        }
+        .success-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.875rem; }
+        .grade-excellent { background: #dcfce7; color: #166534; }
+        .grade-good { background: #fef3c7; color: #92400e; }
+        .grade-pass { background: #dbeafe; color: #1e40af; }
+        .grade-fail { background: #fee2e2; color: #991b1b; }
+        .lang-switch {
+            position: fixed; top: 16px; left: 16px; z-index: 100;
+            background: white; padding: 6px; border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; gap: 4px;
+            border: 2px solid #8b5cf6;
+        }
+        [dir="ltr"] .lang-switch { left: auto; right: 16px; }
+        .lang-btn {
+            padding: 6px 14px; border-radius: 20px; cursor: pointer; font-weight: bold;
+            transition: all 0.3s; border: none; font-size: 0.875rem;
+            background: transparent; color: #6b7280;
+        }
+        .lang-btn.active { background: #8b5cf6; color: white; box-shadow: 0 2px 6px rgba(139,92,246,0.4); }
+        .lang-btn:hover:not(.active) { background: #f5f3ff; color: #8b5cf6; }
+        .shuffle-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 md:p-8 min-h-screen">
+
+    <div class="lang-switch no-print">
+        <button type="button" class="lang-btn active" onclick="setLanguage('ar')" id="btn-ar">عربي</button>
+        <button type="button" class="lang-btn" onclick="setLanguage('en')" id="btn-en">EN</button>
+    </div>
+
+    <div id="timer-container" class="max-w-4xl mx-auto mb-4 text-center no-print">
+        <div class="bg-white p-4 rounded-xl shadow-md inline-block border-2 border-purple-100">
+            <span class="text-gray-600 ml-2" data-ar="⏱️ الوقت المتبقي:" data-en="⏱️ Time Remaining:">⏱️ الوقت المتبقي:</span>
+            <span id="timer" class="text-2xl font-bold text-purple-600 font-mono">60:00</span>
+            <span class="shuffle-badge" data-ar="🔀 أسئلة عشوائية" data-en="🔀 Random Questions">🔀 أسئلة عشوائية</span>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto mb-6 flex flex-wrap gap-3 justify-center no-print">
+        <button type="button" onclick="toggleAnswers()" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg font-medium transition shadow cursor-pointer" data-ar="👁️ إظهار / إخفاء الإجابات" data-en="👁️ Show / Hide Answers">👁️ إظهار / إخفاء الإجابات</button>
+        <button type="button" onclick="window.print()" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-lg font-medium transition shadow cursor-pointer" data-ar="🖨️ طباعة / PDF" data-en="🖨️ Print / PDF">🖨️ طباعة / PDF</button>
+        <button type="button" onclick="reshuffleExam()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-5 py-2 rounded-lg font-medium transition shadow cursor-pointer" data-ar="🔀 إعادة خلط الأسئلة" data-en="🔀 Reshuffle Questions">🔀 إعادة خلط الأسئلة</button>
+    </div>
+
+    <header class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-md mb-8 border-r-4 border-purple-600">
+        <div class="text-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2" data-ar="📝 امتحان طاقة الوضع وفرق الجهد والمكثفات" data-en="📝 Electric PE, Potential Difference & Capacitors Exam">📝 امتحان طاقة الوضع وفرق الجهد والمكثفات</h1>
+            <h2 class="text-lg text-purple-600 font-semibold" data-ar="Electric Potential Energy & Capacitors" data-en="Electric Potential Energy & Capacitors">Electric Potential Energy & Capacitors</h2>
+            <p class="text-sm text-gray-600 mt-2" data-ar="امتحان شامل لطاقة الوضع الكهربائية، فرق الجهد، المجال المنتظم، المكثفات، وتطبيقاتها الحياتية" data-en="Comprehensive exam on electric potential energy, potential difference, uniform fields, capacitors, and their applications">امتحان شامل لطاقة الوضع الكهربائية، فرق الجهد، المجال المنتظم، المكثفات، وتطبيقاتها الحياتية</p>
+            <p class="text-xs text-purple-600 mt-2 font-semibold" data-ar="⚠️ ملاحظة: يتم خلط ترتيب الأسئلة والخيارات تلقائياً مع كل تحديث للصفحة" data-en="⚠️ Note: Questions and options are randomly shuffled on every page refresh">⚠️ ملاحظة: يتم خلط ترتيب الأسئلة والخيارات تلقائياً مع كل تحديث للصفحة</p>
+        </div>
+        <div class="mt-4 flex flex-wrap justify-center gap-4 text-sm text-gray-600">
+            <span><span data-ar="📅 التاريخ:" data-en="📅 Date:">📅 التاريخ:</span> <input type="date" id="examDate" class="border-b border-gray-400 bg-transparent w-32 text-center"></span>
+            <span><span data-ar="👤 الاسم:" data-en="👤 Name:">👤 الاسم:</span> <input type="text" id="studentName" class="border-b border-gray-400 bg-transparent w-32 text-center" placeholder="Enter name" required></span>
+            <span><span data-ar="🏫 الشعبة:" data-en="🏫 Class:">🏫 الشعبة:</span> <input type="text" id="studentClass" class="border-b border-gray-400 bg-transparent w-28 text-center" placeholder="Class"></span>
+            <span><span data-ar="⏱️ المدة: 60 دقيقة" data-en="⏱️ Duration: 60 min">⏱️ المدة: 60 دقيقة</span></span>
+            <span><span data-ar="📊 المجموع: 50 درجة" data-en="📊 Total: 50 pts">📊 المجموع: 50 درجة</span></span>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto space-y-8" id="exam-content"></main>
+
+    <div class="text-center no-print pb-8 mt-8">
+        <button type="button" onclick="gradeExam()" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-lg px-10 py-4 rounded-xl font-bold shadow-xl transition transform hover:scale-105 cursor-pointer" data-ar="📝 تسليم وتصحيح الامتحان" data-en="📝 Submit & Grade Exam">📝 تسليم وتصحيح الامتحان</button>
+    </div>
+
+    <div id="results-panel" class="max-w-4xl mx-auto mt-8 bg-white p-8 rounded-2xl shadow-2xl border-t-4 border-emerald-500 hidden no-print">
+        <h2 class="text-3xl font-bold text-gray-900 mb-6 text-center" data-ar="📊 نتائج الامتحان" data-en="📊 Exam Results">📊 نتائج الامتحان</h2>
+        <div class="grid md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-xl text-center"><p data-ar="اسم الطالب" data-en="Student Name">اسم الطالب</p><p id="res-name" class="font-bold text-xl text-purple-700">-</p></div>
+            <div class="bg-purple-50 p-4 rounded-xl text-center"><p data-ar="التاريخ" data-en="Date">التاريخ</p><p id="res-date" class="font-bold text-xl text-purple-700">-</p></div>
+            <div class="bg-emerald-50 p-4 rounded-xl text-center"><p data-ar="المجموع" data-en="Score">المجموع</p><p id="res-total" class="font-bold text-3xl text-emerald-600">0 / 50</p></div>
+        </div>
+        <div class="text-center mb-6">
+            <span id="success-badge" class="success-badge grade-excellent">-</span>
+            <p id="success-percent" class="text-4xl font-bold text-emerald-600 mt-2">100%</p>
+            <p class="text-sm text-gray-500" data-ar="نسبة النجاح" data-en="Success Rate">نسبة النجاح</p>
+        </div>
+        <div class="bg-gray-50 p-6 rounded-xl mb-6">
+            <h3 class="font-bold text-lg mb-4 text-gray-800" data-ar="📈 تفصيل الأداء حسب القسم:" data-en="📈 Performance Breakdown:">📈 تفصيل الأداء حسب القسم:</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center"><span class="text-gray-700" data-ar="المفاهيم والمصطلحات الأساسية" data-en="Basic Concepts and Terminology">المفاهيم والمصطلحات الأساسية</span><span id="sec1-score" class="font-bold text-purple-600">0/10</span></div>
+                <div class="flex justify-between items-center"><span class="text-gray-700" data-ar="حساب الشغل وفرق الجهد" data-en="Calculating Work and Potential Difference">حساب الشغل وفرق الجهد</span><span id="sec2-score" class="font-bold text-purple-600">0/10</span></div>
+                <div class="flex justify-between items-center"><span class="text-gray-700" data-ar="المجال المنتظم وخصائص الموصلات" data-en="Uniform Field and Conductor Properties">المجال المنتظم وخصائص الموصلات</span><span id="sec3-score" class="font-bold text-purple-600">0/10</span></div>
+                <div class="flex justify-between items-center"><span class="text-gray-700" data-ar="المكثفات والسعة الكهربائية" data-en="Capacitors and Capacitance">المكثفات والسعة الكهربائية</span><span id="sec4-score" class="font-bold text-purple-600">0/10</span></div>
+                <div class="flex justify-between items-center"><span class="text-gray-700" data-ar="التطبيقات الحياتية والتفكير النقدي" data-en="Real-life Applications and Critical Thinking">التطبيقات الحياتية والتفكير النقدي</span><span id="sec5-score" class="font-bold text-purple-600">0/10</span></div>
+            </div>
+        </div>
+        <div class="text-center mb-6">
+            <button type="button" id="sendEmailBtn" onclick="sendResultsToEmail()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-lg px-8 py-3 rounded-xl font-bold shadow-xl transition transform hover:scale-105 cursor-pointer" data-ar="📧 إرسال النتائج للمعلم" data-en="📧 Send Results to Teacher">📧 إرسال النتائج للمعلم</button>
+            <p id="emailStatus" class="text-sm mt-2 text-center font-medium"></p>
+        </div>
+        <div class="flex gap-3 justify-center">
+            <button type="button" onclick="window.print()" class="bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold" data-ar="🖨️ طباعة النتائج" data-en="🖨️ Print Results">🖨️ طباعة النتائج</button>
+        </div>
+    </div>
+
+    <footer class="max-w-4xl mx-auto mt-10 mb-8 text-center text-gray-500 text-sm no-print">
+        © <span data-ar="Electric PE, Potential Difference & Capacitors" data-en="Electric PE, Potential Difference & Capacitors">Electric PE, Potential Difference & Capacitors</span> | Mr. Mohammed Hesham
+    </footer>
+
+<script>
+// ==================== EmailJS Settings ====================
+const PUBLIC_KEY = "Rb3Lq8tXaFmc5YHUH";
+const SERVICE_ID = "service_w15m64i";
+const TEMPLATE_ID = "template_5b0u2tq";
+const TARGET_EMAIL = "mohammedhesham872@gmail.com";
+
+emailjs.init(PUBLIC_KEY);
+
+// ==================== SVG Graphics Templates ====================
+const svgParallelPlates = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150" class="w-64 h-32 mx-auto my-2 drop-shadow-sm">
+    <defs>
+        <marker id="arrowPP" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L9,3 z" fill="#dc2626" />
+        </marker>
+    </defs>
+    <rect x="40" y="20" width="15" height="110" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="47" y="145" font-size="12" fill="#2563eb" font-weight="bold" text-anchor="middle">-</text>
+    <rect x="245" y="20" width="15" height="110" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="252" y="145" font-size="12" fill="#dc2626" font-weight="bold" text-anchor="middle">+</text>
+    <line x1="70" y1="75" x2="110" y2="75" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowPP)"/>
+    <line x1="130" y1="75" x2="170" y2="75" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowPP)"/>
+    <line x1="190" y1="75" x2="230" y2="75" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowPP)"/>
+    <line x1="70" y1="50" x2="110" y2="50" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowPP)"/>
+    <line x1="190" y1="50" x2="230" y2="50" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowPP)"/>
+    <line x1="70" y1="100" x2="110" y2="100" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowPP)"/>
+    <line x1="190" y1="100" x2="230" y2="100" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowPP)"/>
+    <text x="150" y="145" font-size="11" fill="#4b5563" font-weight="bold" text-anchor="middle">مجال منتظم: ΔV = Ed</text>
+</svg>`;
+
+const svgCapacitor = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150" class="w-64 h-32 mx-auto my-2 drop-shadow-sm">
+    <rect x="80" y="20" width="20" height="110" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="90" y="145" font-size="12" fill="#2563eb" font-weight="bold" text-anchor="middle">-</text>
+    <rect x="200" y="20" width="20" height="110" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="210" y="145" font-size="12" fill="#dc2626" font-weight="bold" text-anchor="middle">+</text>
+    <line x1="90" y1="20" x2="90" y2="5" stroke="#4b5563" stroke-width="2"/>
+    <line x1="90" y1="5" x2="50" y2="5" stroke="#4b5563" stroke-width="2"/>
+    <line x1="210" y1="20" x2="210" y2="5" stroke="#4b5563" stroke-width="2"/>
+    <line x1="210" y1="5" x2="250" y2="5" stroke="#4b5563" stroke-width="2"/>
+    <text x="150" y="75" font-size="16" fill="#7c3aed" font-weight="bold" text-anchor="middle">C = q/ΔV</text>
+    <text x="150" y="145" font-size="11" fill="#4b5563" font-weight="bold" text-anchor="middle">المكثف (Capacitor)</text>
+</svg>`;
+
+const svgMillikan = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180" class="w-64 h-40 mx-auto my-2 drop-shadow-sm">
+    <rect x="40" y="20" width="15" height="140" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="47" y="175" font-size="11" fill="#2563eb" font-weight="bold" text-anchor="middle">-</text>
+    <rect x="245" y="20" width="15" height="140" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="252" y="175" font-size="11" fill="#dc2626" font-weight="bold" text-anchor="middle">+</text>
+    <circle cx="150" cy="90" r="10" fill="#fbbf24" stroke="#d97706" stroke-width="2"/>
+    <text x="150" y="95" font-size="10" fill="#92400e" font-weight="bold" text-anchor="middle">قطرة</text>
+    <line x1="150" y1="100" x2="150" y2="130" stroke="#dc2626" stroke-width="2" marker-end="url(#arrowM)"/>
+    <text x="160" y="120" font-size="10" fill="#dc2626" font-weight="bold">mg</text>
+    <line x1="150" y1="80" x2="150" y2="50" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowM)"/>
+    <text x="160" y="70" font-size="10" fill="#2563eb" font-weight="bold">qE</text>
+    <defs>
+        <marker id="arrowM" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L9,3 z" fill="currentColor" />
+        </marker>
+    </defs>
+    <text x="150" y="178" font-size="10" fill="#4b5563" font-weight="bold" text-anchor="middle">تجربة مليكان: qE = mg</text>
+</svg>`;
+
+const svgLightningRod = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180" class="w-64 h-40 mx-auto my-2 drop-shadow-sm">
+    <rect x="100" y="100" width="100" height="70" fill="#d1d5db" stroke="#4b5563" stroke-width="2"/>
+    <text x="150" y="140" font-size="11" fill="#4b5563" font-weight="bold" text-anchor="middle">مبنى</text>
+    <polygon points="150,30 140,100 160,100" fill="#fbbf24" stroke="#d97706" stroke-width="2"/>
+    <line x1="150" y1="100" x2="150" y2="170" stroke="#4b5563" stroke-width="3"/>
+    <line x1="130" y1="170" x2="170" y2="170" stroke="#4b5563" stroke-width="2"/>
+    <line x1="135" y1="175" x2="165" y2="175" stroke="#4b5563" stroke-width="2"/>
+    <line x1="140" y1="180" x2="160" y2="180" stroke="#4b5563" stroke-width="2"/>
+    <path d="M 50 10 L 70 30 L 60 30 L 80 60" stroke="#fbbf24" stroke-width="3" fill="none"/>
+    <text x="150" y="20" font-size="11" fill="#4b5563" font-weight="bold" text-anchor="middle">مانع الصواعق</text>
+</svg>`;
+
+const svgWorkEnergy = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150" class="w-64 h-32 mx-auto my-2 drop-shadow-sm">
+    <defs>
+        <marker id="arrowWE" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L9,3 z" fill="#16a34a" />
+        </marker>
+    </defs>
+    <circle cx="50" cy="75" r="20" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+    <text x="50" y="80" font-size="16" fill="#dc2626" font-weight="bold" text-anchor="middle">+</text>
+    <circle cx="250" cy="75" r="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="250" y="80" font-size="10" fill="#16a34a" font-weight="bold" text-anchor="middle">q</text>
+    <line x1="70" y1="75" x2="230" y2="75" stroke="#16a34a" stroke-width="3" marker-end="url(#arrowWE)"/>
+    <text x="150" y="65" font-size="12" fill="#16a34a" font-weight="bold" text-anchor="middle">W = qΔV</text>
+    <text x="150" y="110" font-size="11" fill="#4b5563" font-weight="bold" text-anchor="middle">الشغل = الشحنة × فرق الجهد</text>
+    <text x="150" y="130" font-size="10" fill="#7c3aed" font-weight="bold" text-anchor="middle">PE = qV</text>
+</svg>`;
+
+const originalExamData = {
+    sections: [
+        {
+            id: 'sec1',
+            title: { ar: '🔹 الجزء الأول: المفاهيم والمصطلحات الأساسية', en: '🔹 Part 1: Basic Concepts and Terminology' },
+            questions: [
+                { q: { ar: 'ما هي طاقة الوضع الكهربائية (Electric Potential Energy)؟', en: 'What is Electric Potential Energy?' }, options: [ { ar: 'الطاقة المختزنة في نظام من الشحنات بسبب مواقعها النسبية في المجال الكهربائي', en: 'Energy stored in a system of charges due to their relative positions in an electric field' }, { ar: 'طاقة الحركة للشحنات المتحركة', en: 'Kinetic energy of moving charges' }, { ar: 'الطاقة الحرارية الناتجة عن الاحتكاك', en: 'Thermal energy from friction' }, { ar: 'الطاقة المغناطيسية للمغناطيس', en: 'Magnetic energy of a magnet' } ], correct: 0, answer: { ar: 'طاقة الوضع الكهربائية تُقاس بالجول وتعتمد على مواقع الشحنات في المجال', en: 'Electric potential energy is measured in Joules and depends on charge positions in the field' } },
+                { 
+                    q: { ar: 'ما هو فرق الجهد الكهربائي (Potential Difference)؟', en: 'What is Potential Difference?' },
+                    image: svgWorkEnergy,
+                    options: [ { ar: 'الشغل المبذول لنقل شحنة اختبار موجبة بين نقطتين مقسوماً على مقدار تلك الشحنة', en: 'Work done to move a positive test charge between two points divided by the charge magnitude' }, { ar: 'القوة المؤثرة على الشحنة', en: 'Force acting on the charge' }, { ar: 'شدة المجال الكهربائي', en: 'Electric field intensity' }, { ar: 'كمية الشحنة في الموصل', en: 'Amount of charge in the conductor' } ], 
+                    correct: 0, 
+                    answer: { ar: 'فرق الجهد ΔV = W/q، ويُقاس بالفولت (V = J/C)', en: 'Potential difference ΔV = W/q, measured in volts (V = J/C)' } 
+                },
+                { q: { ar: 'ما وحدة قياس فرق الجهد الكهربائي في نظام الوحدات الدولي (SI)؟', en: 'What is the SI unit of potential difference?' }, options: [ { ar: 'فولت (V = J/C)', en: 'Volt (V = J/C)' }, { ar: 'نيوتن (N)', en: 'Newton (N)' }, { ar: 'كولوم (C)', en: 'Coulomb (C)' }, { ar: 'أمبير (A)', en: 'Ampere (A)' } ], correct: 0, answer: { ar: 'الفولت = جول ÷ كولوم', en: 'Volt = Joule ÷ Coulomb' } },
+                { 
+                    q: { ar: 'ما هو المجال الكهربائي المنتظم (Uniform Electric Field)؟', en: 'What is a Uniform Electric Field?' },
+                    image: svgParallelPlates,
+                    options: [ { ar: 'مجال ثابت في المقدار والاتجاه، يتكون عادةً بين صفيحتين متوازيتين مشحونتين بشحنتين متعاكستين', en: 'A field constant in magnitude and direction, typically formed between two parallel plates with opposite charges' }, { ar: 'مجال يتغير باستمرار', en: 'A continuously changing field' }, { ar: 'مجال مغناطيسي فقط', en: 'A magnetic field only' }, { ar: 'مجال عشوائي الاتجاه', en: 'A randomly directed field' } ], 
+                    correct: 0, 
+                    answer: { ar: 'المجال المنتظم له نفس الشدة والاتجاه في كل نقطة، مثل المجال بين صفيحتين متوازيتين', en: 'A uniform field has the same magnitude and direction at every point, like the field between parallel plates' } },
+                { 
+                    q: { ar: 'ما هو المكثف (Capacitor)؟', en: 'What is a Capacitor?' },
+                    image: svgCapacitor,
+                    options: [ { ar: 'جهاز يُستخدم لتخزين الشحنات الكهربائية وطاقة الوضع الكهربائية، ويتكون عادةً من موصلين مفصولين بعازل', en: 'A device used to store electric charges and potential energy, typically consisting of two conductors separated by an insulator' }, { ar: 'جهاز يولد التيار الكهربائي', en: 'A device that generates electric current' }, { ar: 'سلك موصل للكهرباء', en: 'An electrically conductive wire' }, { ar: 'مقاومة كهربائية', en: 'Electrical resistance' } ], 
+                    correct: 0, 
+                    answer: { ar: 'المكثف يخزن الطاقة في المجال الكهربائي بين لوحيه', en: 'A capacitor stores energy in the electric field between its plates' } },
+                { q: { ar: 'ما هي السعة الكهربائية (Capacitance)؟', en: 'What is Capacitance?' }, options: [ { ar: 'مقدار الشحنة التي يمكن تخزينها على كل لوح من لوحات المكثف لكل وحدة فرق جهد (C = q/ΔV)', en: 'The amount of charge that can be stored per unit potential difference on each plate (C = q/ΔV)' }, { ar: 'كمية التيار المار في المكثف', en: 'The amount of current flowing through the capacitor' }, { ar: 'مقاومة المكثف للتيار', en: 'The resistance of the capacitor to current' }, { ar: 'سرعة تفريغ المكثف', en: 'The discharge speed of the capacitor' } ], correct: 0, answer: { ar: 'السعة تُقاس بالفاراد (F)، وتمثل قدرة المكثف على تخزين الشحنة', en: 'Capacitance is measured in Farads (F), representing the capacitor\'s ability to store charge' } },
+                { q: { ar: 'ما وحدة قياس السعة الكهربائية في نظام الوحدات الدولي (SI)؟', en: 'What is the SI unit of capacitance?' }, options: [ { ar: 'فاراد (F = C/V)', en: 'Farad (F = C/V)' }, { ar: 'أوم (Ω)', en: 'Ohm (Ω)' }, { ar: 'واط (W)', en: 'Watt (W)' }, { ar: 'هِنري (H)', en: 'Henry (H)' } ], correct: 0, answer: { ar: 'الفاراد = كولوم ÷ فولت', en: 'Farad = Coulomb ÷ Volt' } },
+                { q: { ar: 'ما المقصود بـ "تكميم الشحنة" (Charge Quantization)؟', en: 'What is meant by "Charge Quantization"?' }, options: [ { ar: 'الشحنة لا تتجزأ، وأي شحنة على جسم هي مضاعف صحيح للشحنة الأولية للإلكترون أو البروتون (q = ne)', en: 'Charge is indivisible, and any charge on an object is an integer multiple of the elementary charge (q = ne)' }, { ar: 'الشحنة يمكن أن تأخذ أي قيمة كسرية', en: 'Charge can take any fractional value' }, { ar: 'الشحنة تتغير مع الزمن', en: 'Charge changes with time' }, { ar: 'الشحنة تعتمد على درجة الحرارة', en: 'Charge depends on temperature' } ], correct: 0, answer: { ar: 'تكميم الشحنة يعني أنها تأتي في حزم منفصلة بقيمة e = 1.602×10⁻¹⁹ C', en: 'Charge quantization means it comes in discrete packets of value e = 1.602×10⁻¹⁹ C' } },
+                { q: { ar: 'ما هي قيمة الشحنة الأولية للإلكترون (e)؟', en: 'What is the elementary charge of an electron (e)?' }, options: [ { ar: '1.602 × 10⁻¹⁹ C', en: '1.602 × 10⁻¹⁹ C' }, { ar: '9.0 × 10⁹ N·m²/C²', en: '9.0 × 10⁹ N·m²/C²' }, { ar: '6.67 × 10⁻¹¹ N·m²/kg²', en: '6.67 × 10⁻¹¹ N·m²/kg²' }, { ar: '3 × 10⁸ m/s', en: '3 × 10⁸ m/s' } ], correct: 0, answer: { ar: 'شحنة الإلكترون = 1.602 × 10⁻¹⁹ كولوم', en: 'Electron charge = 1.602 × 10⁻¹⁹ Coulomb' } },
+                { q: { ar: 'ما العلاقة بين الشغل المبذول وطاقة الوضع الكهربائية؟', en: 'What is the relationship between work done and electric potential energy?' }, options: [ { ar: 'الشغل المبذول يساوي التغير في طاقة الوضع الكهربائية (W = ΔPE)', en: 'Work done equals the change in electric potential energy (W = ΔPE)' }, { ar: 'الشغل يساوي طاقة الوضع دائماً', en: 'Work always equals potential energy' }, { ar: 'لا توجد علاقة بينهما', en: 'There is no relationship between them' }, { ar: 'الشغل يساوي نصف طاقة الوضع', en: 'Work equals half the potential energy' } ], correct: 0, answer: { ar: 'الشغل المنجز على الشحنة يُخزن كطاقة وضع كهربائية', en: 'Work done on a charge is stored as electric potential energy' } }
+            ]
+        },
+        {
+            id: 'sec2',
+            title: { ar: '🔹 الجزء الثاني: حساب الشغل وفرق الجهد', en: '🔹 Part 2: Calculating Work and Potential Difference' },
+            questions: [
+                { 
+                    q: { ar: 'ما الصيغة الرياضية لحساب فرق الجهد (ΔV) بدلالة الشغل (W) والشحنة (q)؟', en: 'What is the mathematical formula for potential difference (ΔV) in terms of work (W) and charge (q)?' },
+                    image: svgWorkEnergy,
+                    options: [ { ar: 'ΔV = W / q', en: 'ΔV = W / q' }, { ar: 'ΔV = W × q', en: 'ΔV = W × q' }, { ar: 'ΔV = q / W', en: 'ΔV = q / W' }, { ar: 'ΔV = W + q', en: 'ΔV = W + q' } ], 
+                    correct: 0, 
+                    answer: { ar: 'فرق الجهد = الشغل ÷ الشحنة', en: 'Potential difference = Work ÷ Charge' } 
+                },
+                { q: { ar: 'إذا بُذل شغل مقداره 20 J لنقل شحنة مقدارها 4×10⁻⁶ C، فما فرق الجهد؟', en: 'If 20 J of work is done to move a charge of 4×10⁻⁶ C, what is the potential difference?' }, options: [ { ar: '5 × 10⁶ V', en: '5 × 10⁶ V' }, { ar: '80 × 10⁻⁶ V', en: '80 × 10⁻⁶ V' }, { ar: '5 × 10⁻⁶ V', en: '5 × 10⁻⁶ V' }, { ar: '80 × 10⁶ V', en: '80 × 10⁶ V' } ], correct: 0, answer: { ar: 'ΔV = W/q = 20 / (4×10⁻⁶) = 5 × 10⁶ V', en: 'ΔV = W/q = 20 / (4×10⁻⁶) = 5 × 10⁶ V' } },
+                { q: { ar: 'ما مقدار الشغل اللازم لنقل شحنة مقدارها 2×10⁻⁶ C عبر فرق جهد 100 V؟', en: 'What is the work required to move a charge of 2×10⁻⁶ C across a potential difference of 100 V?' }, options: [ { ar: '2 × 10⁻⁴ J', en: '2 × 10⁻⁴ J' }, { ar: '50 × 10⁻⁶ J', en: '50 × 10⁻⁶ J' }, { ar: '2 × 10⁻⁸ J', en: '2 × 10⁻⁸ J' }, { ar: '200 J', en: '200 J' } ], correct: 0, answer: { ar: 'W = qΔV = (2×10⁻⁶) × 100 = 2 × 10⁻⁴ J', en: 'W = qΔV = (2×10⁻⁶) × 100 = 2 × 10⁻⁴ J' } },
+                { q: { ar: 'إذا كانت القوة المؤثرة على شحنة 5×10⁻⁹ C هي 10⁻⁶ N، وتم تحريكها مسافة 0.2 m، فما الشغل المبذول؟', en: 'If the force on a charge of 5×10⁻⁹ C is 10⁻⁶ N and it is moved 0.2 m, what is the work done?' }, options: [ { ar: '2 × 10⁻⁷ J', en: '2 × 10⁻⁷ J' }, { ar: '5 × 10⁻⁶ J', en: '5 × 10⁻⁶ J' }, { ar: '2 × 10⁻⁸ J', en: '2 × 10⁻⁸ J' }, { ar: '2 × 10⁻⁶ J', en: '2 × 10⁻⁶ J' } ], correct: 0, answer: { ar: 'W = F·d = 10⁻⁶ × 0.2 = 2 × 10⁻⁷ J', en: 'W = F·d = 10⁻⁶ × 0.2 = 2 × 10⁻⁷ J' } },
+                { q: { ar: 'إذا بُذل شغل سالب لنقل شحنة بين نقطتين، فماذا يعني ذلك؟', en: 'If negative work is done to move a charge between two points, what does that mean?' }, options: [ { ar: 'الشحنة تحركت عكس اتجاه القوة الكهربائية (مثل تحريك شحنة موجبة نحو شحنة موجبة أخرى)', en: 'The charge moved against the electric force direction (like moving a positive charge toward another positive charge)' }, { ar: 'الشحنة تحركت مع اتجاه القوة', en: 'The charge moved with the force direction' }, { ar: 'لا يوجد مجال كهربائي', en: 'There is no electric field' }, { ar: 'الشحنة متعادلة', en: 'The charge is neutral' } ], correct: 0, answer: { ar: 'الشغل السالب يعني أن القوة الخارجية عاكست القوة الكهربائية', en: 'Negative work means the external force opposed the electric force' } },
+                { q: { ar: 'إذا كانت طاقة الوضع الكهربائية لشحنة عند نقطة A هي 10 J، وعند نقطة B هي 4 J، فما الشغل المبذول لنقلها من A إلى B؟', en: 'If the electric potential energy of a charge at point A is 10 J and at point B is 4 J, what is the work done to move it from A to B?' }, options: [ { ar: '6 J (الشغل = PE_A - PE_B)', en: '6 J (work = PE_A - PE_B)' }, { ar: '14 J', en: '14 J' }, { ar: '-6 J', en: '-6 J' }, { ar: '40 J', en: '40 J' } ], correct: 0, answer: { ar: 'W = PE_A - PE_B = 10 - 4 = 6 J', en: 'W = PE_A - PE_B = 10 - 4 = 6 J' } },
+                { q: { ar: 'ما وحدة قياس الشغل في نظام الوحدات الدولي (SI)؟', en: 'What is the SI unit of work?' }, options: [ { ar: 'جول (J)', en: 'Joule (J)' }, { ar: 'نيوتن (N)', en: 'Newton (N)' }, { ar: 'واط (W)', en: 'Watt (W)' }, { ar: 'فولت (V)', en: 'Volt (V)' } ], correct: 0, answer: { ar: 'الشغل يُقاس بالجول (J = N·m)', en: 'Work is measured in Joules (J = N·m)' } },
+                { q: { ar: 'إذا كان فرق الجهد بين نقطتين يساوي صفراً، فما الشغل اللازم لنقل شحنة بينهما؟', en: 'If the potential difference between two points is zero, what is the work required to move a charge between them?' }, options: [ { ar: 'صفر (W = qΔV = q × 0 = 0)', en: 'Zero (W = qΔV = q × 0 = 0)' }, { ar: 'يعتمد على مقدار الشحنة', en: 'Depends on the charge magnitude' }, { ar: 'غير محدد', en: 'Undefined' }, { ar: 'يساوي طاقة الوضع', en: 'Equals the potential energy' } ], correct: 0, answer: { ar: 'عندما ΔV = 0، لا يُبذل شغل صافٍ لنقل الشحنة', en: 'When ΔV = 0, no net work is done to move the charge' } },
+                { q: { ar: 'إذا تحركت شحنة في اتجاه المجال الكهربائي، ماذا يحدث لطاقة وضعها الكهربائية؟', en: 'If a positive charge moves in the direction of the electric field, what happens to its electric potential energy?' }, options: [ { ar: 'تقل (لأن المجال يبذل شغلاً موجباً عليها)', en: 'It decreases (because the field does positive work on it)' }, { ar: 'تزداد', en: 'It increases' }, { ar: 'تبقى ثابتة', en: 'It remains constant' }, { ar: 'تصبح صفراً', en: 'It becomes zero' } ], correct: 0, answer: { ar: 'الشحنة الموجبة تفقد طاقة وضع عندما تتحرك مع اتجاه المجال', en: 'A positive charge loses potential energy when moving with the field direction' } },
+                { q: { ar: 'ما العلاقة بين فرق الجهد (ΔV) وطاقة الوضع الكهربائية (PE) لشحنة q؟', en: 'What is the relationship between potential difference (ΔV) and electric potential energy (PE) for a charge q?' }, options: [ { ar: 'ΔPE = q × ΔV', en: 'ΔPE = q × ΔV' }, { ar: 'ΔPE = ΔV / q', en: 'ΔPE = ΔV / q' }, { ar: 'ΔPE = q / ΔV', en: 'ΔPE = q / ΔV' }, { ar: 'ΔPE = q + ΔV', en: 'ΔPE = q + ΔV' } ], correct: 0, answer: { ar: 'التغير في طاقة الوضع = الشحنة × فرق الجهد', en: 'Change in potential energy = charge × potential difference' } }
+            ]
+        },
+        {
+            id: 'sec3',
+            title: { ar: '🔹 الجزء الثالث: المجال المنتظم وخصائص الموصلات', en: '🔹 Part 3: Uniform Field and Conductor Properties' },
+            questions: [
+                { 
+                    q: { ar: 'ما العلاقة بين شدة المجال الكهربائي (E)، فرق الجهد (ΔV)، والمسافة (d) في مجال منتظم؟', en: 'What is the relationship between electric field intensity (E), potential difference (ΔV), and distance (d) in a uniform field?' },
+                    image: svgParallelPlates,
+                    options: [ { ar: 'ΔV = E × d', en: 'ΔV = E × d' }, { ar: 'ΔV = E / d', en: 'ΔV = E / d' }, { ar: 'ΔV = d / E', en: 'ΔV = d / E' }, { ar: 'ΔV = E + d', en: 'ΔV = E + d' } ], 
+                    correct: 0, 
+                    answer: { ar: 'فرق الجهد = شدة المجال × المسافة', en: 'Potential difference = field intensity × distance' } },
+                { q: { ar: 'إذا كانت شدة المجال بين صفيحتين متوازيتين 500 N/C والمسافة بينهما 0.1 m، فما فرق الجهد؟', en: 'If the field intensity between two parallel plates is 500 N/C and the distance between them is 0.1 m, what is the potential difference?' }, options: [ { ar: '50 V', en: '50 V' }, { ar: '5000 V', en: '5000 V' }, { ar: '5 V', en: '5 V' }, { ar: '0.005 V', en: '0.005 V' } ], correct: 0, answer: { ar: 'ΔV = E × d = 500 × 0.1 = 50 V', en: 'ΔV = E × d = 500 × 0.1 = 50 V' } },
+                { q: { ar: 'ما وحدة قياس شدة المجال الكهربائي (E) بدلالة الفولت؟', en: 'What is the unit of electric field intensity (E) in terms of volts?' }, options: [ { ar: 'فولت لكل متر (V/m)', en: 'Volt per meter (V/m)' }, { ar: 'فولت لكل ثانية', en: 'Volt per second' }, { ar: 'فولت لكل كولوم', en: 'Volt per Coulomb' }, { ar: 'فولت لكل متر مربع', en: 'Volt per square meter' } ], correct: 0, answer: { ar: 'E = ΔV/d، لذا V/m = N/C', en: 'E = ΔV/d, so V/m = N/C' } },
+                { q: { ar: 'ما قيمة شدة المجال الكهربائي داخل موصل مصمت في حالة اتزان إلكتروستاتيكي؟', en: 'What is the value of electric field intensity inside a solid conductor in electrostatic equilibrium?' }, options: [ { ar: 'تساوي صفراً (E = 0)', en: 'It equals zero (E = 0)' }, { ar: 'تساوي شدة المجال الخارجي', en: 'It equals the external field intensity' }, { ar: 'غير محددة', en: 'Undefined' }, { ar: 'تساوي ضعف المجال الخارجي', en: 'It equals twice the external field' } ], correct: 0, answer: { ar: 'الإلكترونات الحرة تتحرك حتى تلغي المجال الداخلي', en: 'Free electrons move until they cancel the internal field' } },
+                { q: { ar: 'أين تتوزع الشحنات الزائدة على موصل مشحون في حالة الاتزان؟', en: 'Where do excess charges distribute on a charged conductor in equilibrium?' }, options: [ { ar: 'على السطح الخارجي فقط', en: 'Only on the outer surface' }, { ar: 'في مركز الموصل', en: 'At the center of the conductor' }, { ar: 'بالتساوي في كل حجم الموصل', en: 'Equally throughout the conductor\'s volume' }, { ar: 'عشوائياً في أي مكان', en: 'Randomly anywhere' } ], correct: 0, answer: { ar: 'الشحنات المتشابهة تتنافر وتتحرك لأبعد نقطة ممكنة، أي إلى السطح', en: 'Like charges repel and move to the farthest point, which is the surface' } },
+                { q: { ar: 'لماذا تتركز الشحنات بكثافة أكبر عند الأطراف الحادة للموصل؟', en: 'Why do charges concentrate with higher density at the sharp edges of a conductor?' }, options: [ { ar: 'لأن الشحنات تتنافر وتتحرك لأبعد نقطة ممكنة عن بعضها، وهي الأطراف الحادة', en: 'Because charges repel and move to the farthest possible point from each other, which are the sharp edges' }, { ar: 'لأن الأطراف الحادة تمتص الشحنات', en: 'Because sharp edges absorb charges' }, { ar: 'لأن الأطراف الحادة عازلة', en: 'Because sharp edges are insulating' }, { ar: 'لا يوجد تركيز عند الأطراف', en: 'There is no concentration at the edges' } ], correct: 0, answer: { ar: 'التنافر يدفع الشحنات للأطراف الحادة، مما يولد مجالاً قوياً جداً', en: 'Repulsion pushes charges to sharp edges, creating a very strong field' } },
+                { q: { ar: 'ماذا يحدث عندما يصبح المجال الكهربائي عند طرف حاد لموصل قوياً جداً؟', en: 'What happens when the electric field at a sharp edge of a conductor becomes very strong?' }, options: [ { ar: 'يؤين الهواء المحيط وقد يحدث شرر أو تفريغ كهربائي', en: 'It ionizes the surrounding air and may cause a spark or electrical discharge' }, { ar: 'يتحول الموصل إلى عازل', en: 'The conductor turns into an insulator' }, { ar: 'تختفي الشحنات', en: 'The charges disappear' }, { ar: 'يزداد حجم الموصل', en: 'The conductor\'s size increases' } ], correct: 0, answer: { ar: 'تأين الهواء يسمح بتسرب الشحنات تدريجياً أو حدوث شرر', en: 'Air ionization allows gradual charge leakage or sparking' } },
+                { q: { ar: 'إذا كانت المسافة بين صفيحتين متوازيتين 0.05 m وفرق الجهد بينهما 200 V، فما شدة المجال؟', en: 'If the distance between two parallel plates is 0.05 m and the potential difference is 200 V, what is the field intensity?' }, options: [ { ar: '4000 N/C', en: '4000 N/C' }, { ar: '10 N/C', en: '10 N/C' }, { ar: '100 N/C', en: '100 N/C' }, { ar: '400 N/C', en: '400 N/C' } ], correct: 0, answer: { ar: 'E = ΔV/d = 200 / 0.05 = 4000 N/C', en: 'E = ΔV/d = 200 / 0.05 = 4000 N/C' } },
+                { q: { ar: 'لماذا يكون المجال الكهربائي داخل الموصل صفراً في حالة الاتزان؟', en: 'Why is the electric field inside a conductor zero in equilibrium?' }, options: [ { ar: 'لأن الإلكترونات الحرة تتحرك حتى تلغي أي مجال داخلي، وعند الاتزان تتوقف الحركة', en: 'Because free electrons move until they cancel any internal field, and at equilibrium, movement stops' }, { ar: 'لأن الموصل لا يحتوي على شحنات', en: 'Because the conductor contains no charges' }, { ar: 'لأن المجال لا يدخل في المعادن', en: 'Because the field does not enter metals' }, { ar: 'لأن الموصل يعكس المجال', en: 'Because the conductor reflects the field' } ], correct: 0, answer: { ar: 'لو كان هناك مجال داخلي، ستتحرك الإلكترونات، وهذا يتعارض مع تعريف الاتزان', en: 'If there were an internal field, electrons would move, contradicting equilibrium definition' } },
+                { q: { ar: 'إذا تضاعفت المسافة بين صفيحتين متوازيتين مع ثبات شدة المجال، ماذا يحدث لفرق الجهد؟', en: 'If the distance between two parallel plates is doubled while the field intensity remains constant, what happens to the potential difference?' }, options: [ { ar: 'يتضاعف (ΔV = E × d)', en: 'It doubles (ΔV = E × d)' }, { ar: 'يقل إلى النصف', en: 'It halves' }, { ar: 'يبقى ثابتاً', en: 'It remains constant' }, { ar: 'يقل إلى الربع', en: 'It decreases to a quarter' } ], correct: 0, answer: { ar: 'ΔV يتناسب طردياً مع d عند ثبات E', en: 'ΔV is directly proportional to d when E is constant' } }
+            ]
+        },
+        {
+            id: 'sec4',
+            title: { ar: '🔹 الجزء الرابع: المكثفات والسعة الكهربائية', en: '🔹 Part 4: Capacitors and Capacitance' },
+            questions: [
+                { 
+                    q: { ar: 'ما الصيغة الرياضية لحساب السعة الكهربائية (C)؟', en: 'What is the mathematical formula for capacitance (C)?' },
+                    image: svgCapacitor,
+                    options: [ { ar: 'C = q / ΔV', en: 'C = q / ΔV' }, { ar: 'C = ΔV / q', en: 'C = ΔV / q' }, { ar: 'C = q × ΔV', en: 'C = q × ΔV' }, { ar: 'C = q + ΔV', en: 'C = q + ΔV' } ], 
+                    correct: 0, 
+                    answer: { ar: 'السعة = الشحنة ÷ فرق الجهد', en: 'Capacitance = charge ÷ potential difference' } 
+                },
+                { q: { ar: 'إذا كان المكثف يخزن شحنة مقدارها 6×10⁻⁶ C وفرق الجهد بين لوحيه 12 V، فما سعته؟', en: 'If a capacitor stores a charge of 6×10⁻⁶ C and the potential difference between its plates is 12 V, what is its capacitance?' }, options: [ { ar: '5 × 10⁻⁷ F', en: '5 × 10⁻⁷ F' }, { ar: '72 × 10⁻⁶ F', en: '72 × 10⁻⁶ F' }, { ar: '2 × 10⁻⁶ F', en: '2 × 10⁻⁶ F' }, { ar: '5 × 10⁻⁶ F', en: '5 × 10⁻⁶ F' } ], correct: 0, answer: { ar: 'C = q/ΔV = (6×10⁻⁶) / 12 = 5 × 10⁻⁷ F', en: 'C = q/ΔV = (6×10⁻⁶) / 12 = 5 × 10⁻⁷ F' } },
+                { q: { ar: 'إذا كانت سعة مكثف 10⁻⁶ F وفرق الجهد بين لوحيه 100 V، فما الشحنة المخزنة؟', en: 'If a capacitor has a capacitance of 10⁻⁶ F and the potential difference between its plates is 100 V, what is the stored charge?' }, options: [ { ar: '10⁻⁴ C', en: '10⁻⁴ C' }, { ar: '10⁻⁸ C', en: '10⁻⁸ C' }, { ar: '10⁻² C', en: '10⁻² C' }, { ar: '10⁻⁶ C', en: '10⁻⁶ C' } ], correct: 0, answer: { ar: 'q = C × ΔV = 10⁻⁶ × 100 = 10⁻⁴ C', en: 'q = C × ΔV = 10⁻⁶ × 100 = 10⁻⁴ C' } },
+                { q: { ar: 'ما الذي يحدد سعة المكثف؟', en: 'What determines the capacitance of a capacitor?' }, options: [ { ar: 'مساحة اللوحين، المسافة بينهما، ونوع العازل (المادة العازلة)', en: 'The area of the plates, the distance between them, and the type of dielectric (insulating material)' }, { ar: 'مقدار الشحنة المخزنة فقط', en: 'Only the stored charge' }, { ar: 'فرق الجهد فقط', en: 'Only the potential difference' }, { ar: 'لون المكثف', en: 'The color of the capacitor' } ], correct: 0, answer: { ar: 'السعة تعتمد على الخصائص الفيزيائية والهندسية للمكثف وليس على الشحنة أو الجهد', en: 'Capacitance depends on the physical and geometric properties of the capacitor, not on charge or voltage' } },
+                { q: { ar: 'إذا تضاعفت مساحة لوحي مكثف مع ثبات المسافة والعازل، ماذا يحدث للسعة؟', en: 'If the area of a capacitor\'s plates is doubled while the distance and dielectric remain constant, what happens to the capacitance?' }, options: [ { ar: 'تتضاعف', en: 'It doubles' }, { ar: 'تقل إلى النصف', en: 'It halves' }, { ar: 'تبقى ثابتة', en: 'It remains constant' }, { ar: 'تقل إلى الربع', en: 'It decreases to a quarter' } ], correct: 0, answer: { ar: 'السعة تتناسب طردياً مع مساحة اللوحين', en: 'Capacitance is directly proportional to the plate area' } },
+                { q: { ar: 'إذا قلت المسافة بين لوحي مكثف إلى النصف مع ثبات المساحة والعازل، ماذا يحدث للسعة؟', en: 'If the distance between a capacitor\'s plates is halved while the area and dielectric remain constant, what happens to the capacitance?' }, options: [ { ar: 'تتضاعف', en: 'It doubles' }, { ar: 'تقل إلى النصف', en: 'It halves' }, { ar: 'تبقى ثابتة', en: 'It remains constant' }, { ar: 'تزداد 4 أضعاف', en: 'It increases 4 times' } ], correct: 0, answer: { ar: 'السعة تتناسب عكسياً مع المسافة بين اللوحين', en: 'Capacitance is inversely proportional to the distance between the plates' } },
+                { q: { ar: 'ما دور العازل (Dielectric) داخل المكثف؟', en: 'What is the role of the dielectric inside a capacitor?' }, options: [ { ar: 'يزيد السعة الكهربائية ويمنع التفريغ بين اللوحين', en: 'It increases capacitance and prevents discharge between the plates' }, { ar: 'يقلل السعة', en: 'It decreases capacitance' }, { ar: 'يولد التيار الكهربائي', en: 'It generates electric current' }, { ar: 'يسخن المكثف', en: 'It heats the capacitor' } ], correct: 0, answer: { ar: 'العازل يزيد السعة بمعامل ثابت العزل الكهربائي (k) ويمنع التلامس بين اللوحين', en: 'The dielectric increases capacitance by the dielectric constant (k) and prevents plate contact' } },
+                { q: { ar: 'كيف تُخزن الطاقة في المكثف؟', en: 'How is energy stored in a capacitor?' }, options: [ { ar: 'في المجال الكهربائي بين اللوحين', en: 'In the electric field between the plates' }, { ar: 'في شكل طاقة حرارية', en: 'As thermal energy' }, { ar: 'في شكل طاقة كيميائية', en: 'As chemical energy' }, { ar: 'في شكل طاقة نووية', en: 'As nuclear energy' } ], correct: 0, answer: { ar: 'الطاقة المخزنة = ½ C(ΔV)²، وتكون في المجال الكهربائي', en: 'Stored energy = ½ C(ΔV)², and it\'s in the electric field' } },
+                { q: { ar: 'إذا كانت سعة مكثف 2×10⁻⁶ F وفرق الجهد 50 V، فما الطاقة المخزنة؟', en: 'If a capacitor has a capacitance of 2×10⁻⁶ F and the potential difference is 50 V, what is the stored energy?' }, options: [ { ar: '2.5 × 10⁻³ J', en: '2.5 × 10⁻³ J' }, { ar: '5 × 10⁻³ J', en: '5 × 10⁻³ J' }, { ar: '10⁻² J', en: '10⁻² J' }, { ar: '5 × 10⁻⁵ J', en: '5 × 10⁻⁵ J' } ], correct: 0, answer: { ar: 'PE = ½ C(ΔV)² = ½ × 2×10⁻⁶ × (50)² = 2.5 × 10⁻³ J', en: 'PE = ½ C(ΔV)² = ½ × 2×10⁻⁶ × (50)² = 2.5 × 10⁻³ J' } },
+                { q: { ar: 'ماذا يحدث عند توصيل مكثفين متماثلين على التوالي؟', en: 'What happens when two identical capacitors are connected in series?' }, options: [ { ar: 'تقل السعة الكلية إلى النصف (1/C_total = 1/C₁ + 1/C₂)', en: 'Total capacitance halves (1/C_total = 1/C₁ + 1/C₂)' }, { ar: 'تتضاعف السعة الكلية', en: 'Total capacitance doubles' }, { ar: 'تبقى السعة كما هي', en: 'Capacitance remains the same' }, { ar: 'تصبح السعة صفراً', en: 'Capacitance becomes zero' } ], correct: 0, answer: { ar: 'على التوالي: 1/C_total = 1/C₁ + 1/C₂، لذا C_total = C/2', en: 'In series: 1/C_total = 1/C₁ + 1/C₂, so C_total = C/2' } }
+            ]
+        },
+        {
+            id: 'sec5',
+            title: { ar: '🔹 الجزء الخامس: التطبيقات الحياتية والتفكير النقدي', en: '🔹 Part 5: Real-life Applications and Critical Thinking' },
+            questions: [
+                { 
+                    q: { ar: 'ما الهدف من تجربة قطرة الزيت لمليكان (1909)؟', en: 'What was the purpose of Millikan\'s oil drop experiment (1909)?' },
+                    image: svgMillikan,
+                    options: [ { ar: 'إثبات أن الشحنة الكهربائية "مكممة" وأن أصغر شحنة حرة هي شحنة الإلكترون (e = 1.602×10⁻¹⁹ C)', en: 'To prove that electric charge is "quantized" and the smallest free charge is the electron charge (e = 1.602×10⁻¹⁹ C)' }, { ar: 'قياس سرعة الضوء', en: 'To measure the speed of light' }, { ar: 'اكتشاف البروتون', en: 'To discover the proton' }, { ar: 'قياس كتلة الذرة', en: 'To measure the mass of an atom' } ], 
+                    correct: 0, 
+                    answer: { ar: 'مليكان علق قطرات زيت بين صفيحتين ووازن بين mg و qE لحساب شحنة القطرة', en: 'Millikan suspended oil drops between plates and balanced mg and qE to calculate the drop\'s charge' } 
+                },
+                { 
+                    q: { ar: 'كيف يعمل مانع الصواعق (Lightning Rod)؟', en: 'How does a lightning rod work?' },
+                    image: svgLightningRod,
+                    options: [ { ar: 'قضيب معدني حاد يُثبت على أسطح المباني ويُؤرض، حيث يؤين الهواء المحيط ويسمح بتفريغ الشحنات بأمان', en: 'A sharp metal rod mounted on building roofs and grounded, ionizing the surrounding air and allowing safe charge discharge' }, { ar: 'يمتص الصواعق ويخزنها في بطاريات', en: 'Absorbs lightning and stores it in batteries' }, { ar: 'يعكس الصواعق إلى السحب', en: 'Reflects lightning back to the clouds' }, { ar: 'يولد الكهرباء من الصواعق', en: 'Generates electricity from lightning' } ], 
+                    correct: 0, 
+                    answer: { ar: 'الأطراف الحادة تولد مجالاً قوياً يؤين الهواء، مما يسمح بتسرب الشحنات تدريجياً أو توجيه الصاعقة بأمان', en: 'Sharp edges create a strong field that ionizes air, allowing gradual charge leakage or safe lightning direction' } 
+                },
+                { q: { ar: 'ما دور المكثفات في كاميرات الفلاش؟', en: 'What is the role of capacitors in camera flashes?' }, options: [ { ar: 'تخزين الطاقة وإطلاقها بسرعة عالية لإنتاج ومضة ضوئية قوية', en: 'Storing energy and releasing it quickly to produce a strong light flash' }, { ar: 'تسخين الفلاش', en: 'Heating the flash' }, { ar: 'توليد الصوت', en: 'Generating sound' }, { ar: 'تبريد الكاميرا', en: 'Cooling the camera' } ], correct: 0, answer: { ar: 'المكثف يخزن الشحنة ببطء ثم يفرغها فجأة لإنتاج الضوء', en: 'The capacitor slowly stores charge then suddenly discharges to produce light' } },
+                { q: { ar: 'ما دور المكثفات في مقومات الرجفان (Defibrillators) الطبية؟', en: 'What is the role of capacitors in medical defibrillators?' }, options: [ { ar: 'تخزين شحنة كبيرة وإطلاقها في لحظة محددة لاستعادة انتظام نبضات القلب', en: 'Storing a large charge and releasing it at a specific moment to restore heart rhythm' }, { ar: 'قياس ضغط الدم', en: 'Measuring blood pressure' }, { ar: 'تسخين الجسم', en: 'Heating the body' }, { ar: 'تبريد القلب', en: 'Cooling the heart' } ], correct: 0, answer: { ar: 'المكثف يخزن طاقة عالية تُطلق كصدمة كهربائية للقلب', en: 'The capacitor stores high energy released as an electric shock to the heart' } },
+                { q: { ar: 'كيف يعتمد تخطيط كهربية القلب (ECG) على مفاهيم الدرس؟', en: 'How does ECG depend on the lesson concepts?' }, options: [ { ar: 'يقيس فرق الجهد الكهربائي الناتج عن النشاط الكهربائي الحيوي في القلب', en: 'It measures the electric potential difference resulting from the heart\'s bioelectric activity' }, { ar: 'يقيس درجة حرارة القلب', en: 'It measures heart temperature' }, { ar: 'يقيس ضغط الدم', en: 'It measures blood pressure' }, { ar: 'يقيس سرعة تدفق الدم', en: 'It measures blood flow speed' } ], correct: 0, answer: { ar: 'ECG يرصد فروق الجهد الصغيرة الناتجة عن انقباض وانبساط عضلة القلب', en: 'ECG detects small potential differences resulting from heart muscle contraction and relaxation' } },
+                { q: { ar: 'إذا كانت شحنة قطرة زيت في تجربة مليكان هي 4.8×10⁻¹⁹ C، فكم عدد الإلكترونات الزائدة فيها؟', en: 'If an oil drop in Millikan\'s experiment has a charge of 4.8×10⁻¹⁹ C, how many excess electrons does it have?' }, options: [ { ar: '3 إلكترونات', en: '3 electrons' }, { ar: '2 إلكترون', en: '2 electrons' }, { ar: '4 إلكترونات', en: '4 electrons' }, { ar: '5 إلكترونات', en: '5 electrons' } ], correct: 0, answer: { ar: 'n = q/e = (4.8×10⁻¹⁹) / (1.6×10⁻¹⁹) = 3', en: 'n = q/e = (4.8×10⁻¹⁹) / (1.6×10⁻¹⁹) = 3' } },
+                { q: { ar: 'في تجربة مليكان، ما الشرط اللازم لتعليق قطرة الزيت بين الصفيحتين؟', en: 'In Millikan\'s experiment, what is the condition for suspending the oil drop between the plates?' }, options: [ { ar: 'توازن قوة الجاذبية (mg) مع القوة الكهربائية (qE): qE = mg', en: 'Balance of gravitational force (mg) with electric force (qE): qE = mg' }, { ar: 'أن تكون قطرة الزيت موجبة الشحنة فقط', en: 'The oil drop must be positively charged only' }, { ar: 'أن تكون الصفيحتان متعادلتين', en: 'The plates must be neutral' }, { ar: 'أن تكون درجة الحرارة مرتفعة', en: 'The temperature must be high' } ], correct: 0, answer: { ar: 'عندما qE = mg، تكون القوة المحصلة صفراً فتبقى القطرة معلقة', en: 'When qE = mg, the net force is zero and the drop remains suspended' } },
+                { q: { ar: 'تفكير نقدي: لماذا يُنصح بالبقاء داخل السيارة أثناء العاصفة الرعدية؟', en: 'Critical thinking: Why is it advised to stay inside a car during a thunderstorm?' }, options: [ { ar: 'لأن هيكل السيارة المعدني يعمل كقفص فاراداي، حيث يتوزع التيار على السطح الخارجي ويحمي من بداخلها', en: 'Because the car\'s metal body acts as a Faraday cage, where current distributes on the outer surface and protects those inside' }, { ar: 'لأن المطاط في الإطارات عازل كامل', en: 'Because the rubber in the tires is a complete insulator' }, { ar: 'لأن السيارة تجذب الصواعق بعيداً عن الشخص', en: 'Because the car attracts lightning away from the person' }, { ar: 'لا يوجد سبب علمي', en: 'There is no scientific reason' } ], correct: 0, answer: { ar: 'قفص فاراداي يحمي من بداخله لأن الشحنات تتوزع على السطح الخارجي فقط، والمجال الداخلي = 0', en: 'A Faraday cage protects those inside because charges distribute only on the outer surface, and the internal field = 0' } },
+                { q: { ar: 'ما الفرق الأساسي بين المكثف والبطارية؟', en: 'What is the fundamental difference between a capacitor and a battery?' }, options: [ { ar: 'المكثف يخزن الطاقة في مجال كهربائي ويطلقها بسرعة، بينما البطارية تخزنها كيميائياً وتطلقها ببطء', en: 'A capacitor stores energy in an electric field and releases it quickly, while a battery stores it chemically and releases it slowly' }, { ar: 'لا يوجد فرق', en: 'There is no difference' }, { ar: 'البطارية أسرع في التفريغ', en: 'The battery discharges faster' }, { ar: 'المكثف يولد الكهرباء', en: 'The capacitor generates electricity' } ], correct: 0, answer: { ar: 'المكثف تفريغ سريع وطاقة أقل، البطارية تفريغ بطيء وطاقة أكبر', en: 'Capacitor: fast discharge, less energy. Battery: slow discharge, more energy' } },
+                { q: { ar: 'تفكير نقدي: لماذا تُصنع أطراف مانع الصواعق حادة جداً؟', en: 'Critical thinking: Why are lightning rod tips made very sharp?' }, options: [ { ar: 'لأن الأطراف الحادة تتركز عندها الشحنات بكثافة عالية، مما يولد مجالاً كهربائياً قوياً يؤين الهواء', en: 'Because sharp edges concentrate charges with high density, creating a strong electric field that ionizes the air' }, { ar: 'لأن الشكل الحاد أجمل', en: 'Because the sharp shape is more beautiful' }, { ar: 'لتقليل تكلفة التصنيع', en: 'To reduce manufacturing cost' }, { ar: 'لا يوجد سبب علمي', en: 'There is no scientific reason' } ], correct: 0, answer: { ar: 'الحدة تزيد كثافة الشحنات وتؤين الهواء، مما يسمح بتفريغ آمن للشحنات', en: 'Sharpness increases charge density and ionizes air, allowing safe charge discharge' } }
+            ]
+        }
+    ]
+};
+
+// ==================== Helper Functions ====================
+function shuffleArray(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+let examData;
+let correctAnswersMap = {};
+let currentLang = 'ar';
+let timeRemaining = 3600;
+let timerInterval;
+
+function prepareShuffledExam() {
+    examData = JSON.parse(JSON.stringify(originalExamData));
+    correctAnswersMap = {};
+    let globalIdx = 0;
+
+    examData.sections.forEach((section) => {
+        section.questions = shuffleArray(section.questions);
+        section.questions.forEach((q) => {
+            const optionsWithCorrect = q.options.map((opt, idx) => ({
+                option: opt,
+                isCorrect: idx === q.correct
+            }));
+
+            const shuffledOptions = shuffleArray(optionsWithCorrect);
+            q.options = shuffledOptions.map(o => o.option);
+            const newCorrectIndex = shuffledOptions.findIndex(o => o.isCorrect);
+            q.correct = newCorrectIndex;
+
+            correctAnswersMap[globalIdx] = String.fromCharCode(97 + newCorrectIndex);
+            globalIdx++;
+        });
+    });
+}
+
+function reshuffleExam() {
+    prepareShuffledExam();
+    renderExam();
+    document.querySelectorAll('input[type="radio"]:checked').forEach(r => r.checked = false);
+    document.getElementById('results-panel').classList.add('hidden');
+    document.querySelectorAll('.correct, .incorrect').forEach(el => {
+        el.classList.remove('correct', 'incorrect');
+    });
+    alert(currentLang === 'ar' ? '🔀 تم إعادة خلط الأسئلة والخيارات بنجاح!' : '🔀 Questions and options have been reshuffled successfully!');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setLanguage(lang) {
+    currentLang = lang;
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+
+    document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    document.body.classList.toggle('en-mode', lang === 'en');
+
+    document.querySelectorAll('[data-ar][data-en]').forEach(el => {
+        el.textContent = el.getAttribute(`data-${lang}`);
+    });
+
+    renderExam();
+}
+
+function renderExam() {
+    const container = document.getElementById('exam-content');
+    const labels = {
+        ar: { option: ['أ', 'ب', 'ج', 'د'], answer: '✅ الإجابة:' },
+        en: { option: ['A', 'B', 'C', 'D'], answer: '✅ Answer:' }
+    };
+    const lbl = labels[currentLang];
+    const isRTL = currentLang === 'ar';
+
+    let html = '';
+    let globalIdx = 0;
+
+    examData.sections.forEach((section) => {
+        html += `
+        <section class="bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-xl font-bold mb-4 text-purple-700">${section.title[currentLang]}</h2>
+            <ol class="space-y-6 text-sm">`;
+
+        section.questions.forEach((q) => {
+            const borderSide = isRTL ? 'border-r-4 pr-4' : 'border-l-4 pl-4';
+            
+            const imageHtml = q.image ? `<div class="my-3 p-4 bg-gray-50 rounded-xl border border-gray-200 flex justify-center items-center print:bg-white">${q.image}</div>` : '';
+
+            html += `
+                <li class="${borderSide} border-purple-500 py-3" id="q-${globalIdx}">
+                    <strong>${globalIdx + 1}.</strong> ${q.q[currentLang]}
+                    ${imageHtml}
+                    <br>`;
+
+            q.options.forEach((opt, oIdx) => {
+                const radioSide = isRTL ? 'mr-4 ml-2' : 'ml-4 mr-2';
+                html += `
+                    <label class="cursor-pointer block mt-2 ${isRTL ? 'mr-4' : 'ml-4'}">
+                        <input type="radio" name="q${globalIdx}" value="${String.fromCharCode(97 + oIdx)}" class="${radioSide}">
+                        ${lbl.option[oIdx]}) ${opt[currentLang]}
+                    </label>`;
+            });
+
+            html += `
+                    <div class="answer-box text-green-700 mt-3 font-medium hidden">
+                        ${lbl.answer} ${lbl.option[q.correct]}) ${q.options[q.correct][currentLang]} — ${q.answer[currentLang]}
+                    </div>
+                </li>`;
+            globalIdx++;
+        });
+
+        html += `
+            </ol>
+        </section>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function startTimer() {
+    document.getElementById('timer-container').style.display = 'block';
+    timerInterval = setInterval(() => {
+        timeRemaining--;
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = timeRemaining % 60;
+        const timerEl = document.getElementById('timer');
+        timerEl.textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+        if (timeRemaining <= 300) timerEl.classList.add('timer-warning');
+        if (timeRemaining <= 0) {
+            clearInterval(timerInterval);
+            alert(currentLang === 'ar' ? "انتهى الوقت! سيتم تسليم الامتحان تلقائياً." : "Time's up! Exam will be submitted automatically.");
+            gradeExam();
+        }
+    }, 1000);
+}
+
+function toggleAnswers() {
+    document.querySelectorAll('.answer-box').forEach(el => el.classList.toggle('hidden'));
+}
+
+function gradeExam() {
+    clearInterval(timerInterval);
+    let correctCount = 0;
+    let secScores = [0, 0, 0, 0, 0];
+
+    for (let i = 0; i < 50; i++) {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        const li = document.getElementById(`q-${i}`);
+        const correctAnswer = correctAnswersMap[i];
+
+        if (li) {
+            const isCorrect = selected && selected.value === correctAnswer;
+            if (isCorrect) {
+                correctCount++;
+                li.classList.add('correct');
+                li.classList.remove('incorrect');
+                secScores[Math.floor(i / 10)]++;
+            } else {
+                li.classList.add('incorrect');
+                li.classList.remove('correct');
+            }
+        }
+    }
+
+    const score = correctCount; 
+    const successRate = Math.round((score / 50) * 100);
+
+    document.getElementById('res-total').textContent = `${score} / 50`;
+    document.getElementById('res-name').textContent = document.getElementById('studentName').value || (currentLang === 'ar' ? 'طالب' : 'Student');
+    document.getElementById('res-date').textContent = document.getElementById('examDate').value || new Date().toLocaleDateString(currentLang === 'ar' ? 'ar-AE' : 'en-US');
+
+    for (let i = 0; i < 5; i++) {
+        document.getElementById(`sec${i + 1}-score`).textContent = `${secScores[i]}/10`;
+    }
+
+    const badge = document.getElementById('success-badge');
+    const percent = document.getElementById('success-percent');
+    percent.textContent = `${successRate}%`;
+
+    if (currentLang === 'ar') {
+        if (successRate >= 90) { badge.textContent = 'ممتاز'; badge.className = 'success-badge grade-excellent'; }
+        else if (successRate >= 75) { badge.textContent = 'جيد جداً'; badge.className = 'success-badge grade-good'; }
+        else if (successRate >= 50) { badge.textContent = 'جيد'; badge.className = 'success-badge grade-pass'; }
+        else { badge.textContent = 'يحتاج تحسين'; badge.className = 'success-badge grade-fail'; }
+    } else {
+        if (successRate >= 90) { badge.textContent = 'Excellent'; badge.className = 'success-badge grade-excellent'; }
+        else if (successRate >= 75) { badge.textContent = 'Very Good'; badge.className = 'success-badge grade-good'; }
+        else if (successRate >= 50) { badge.textContent = 'Good'; badge.className = 'success-badge grade-pass'; }
+        else { badge.textContent = 'Needs Improvement'; badge.className = 'success-badge grade-fail'; }
+    }
+
+    document.getElementById('results-panel').classList.remove('hidden');
+    document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('sendEmailBtn').classList.remove('hidden');
+}
+
+function sendResultsToEmail() {
+    const name = document.getElementById('studentName').value.trim();
+    if (!name) {
+        alert(currentLang === 'ar' ? '⚠️ يرجى إدخال اسم الطالب أولاً قبل إرسال النتائج.' : '⚠️ Please enter the student name before sending results.');
+        document.getElementById('studentName').focus();
+        return;
+    }
+
+    const btn = document.getElementById('sendEmailBtn');
+    const status = document.getElementById('emailStatus');
+    btn.disabled = true;
+    btn.textContent = currentLang === 'ar' ? '⏳ جاري الإرسال...' : '📤 Sending...';
+
+    const studentClass = document.getElementById('studentClass').value || 'N/A';
+    const date = document.getElementById('examDate').value || new Date().toLocaleDateString();
+    const score = document.getElementById('res-total').textContent;
+    const successRate = document.getElementById('success-percent').textContent;
+    const badge = document.getElementById('success-badge').textContent;
+
+    const sectionNames = {
+        ar: ['المفاهيم والمصطلحات الأساسية', 'حساب الشغل وفرق الجهد', 'المجال المنتظم وخصائص الموصلات', 'المكثفات والسعة الكهربائية', 'التطبيقات الحياتية والتفكير النقدي'],
+        en: ['Basic Concepts and Terminology', 'Calculating Work and Potential Difference', 'Uniform Field and Conductor Properties', 'Capacitors and Capacitance', 'Real-life Applications and Critical Thinking']
+    };
+    const currentSectionNames = sectionNames[currentLang];
+
+    let answersHTML = `<div style="font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ${currentLang === 'ar' ? 'rtl' : 'ltr'};">
+        <div style="background: linear-gradient(135deg, #8b5cf6, #ec4899); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+            <h2 style="margin: 0; font-size: 22px;">📝 ${currentLang === 'ar' ? 'نتيجة امتحان طاقة الوضع وفرق الجهد والمكثفات' : 'Electric PE, Potential Difference & Capacitors Exam Result'}</h2>
+        </div>
+        <div style="background: #f5f3ff; padding: 15px; border: 1px solid #e9d5ff;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 8px; font-weight: bold; color: #7c3aed;">${currentLang === 'ar' ? '👤 الاسم:' : '👤 Name:'}</td><td style="padding: 8px;">${name}</td><td style="padding: 8px; font-weight: bold; color: #7c3aed;">${currentLang === 'ar' ? '🏫 الشعبة:' : '🏫 Class:'}</td><td style="padding: 8px;">${studentClass}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold; color: #7c3aed;">${currentLang === 'ar' ? '📅 التاريخ:' : '📅 Date:'}</td><td style="padding: 8px;">${date}</td><td style="padding: 8px; font-weight: bold; color: #7c3aed;">${currentLang === 'ar' ? '🏆 التقدير:' : '🏆 Grade:'}</td><td style="padding: 8px;">${badge}</td></tr>
+            </table>
+        </div>
+        <div style="background: white; padding: 20px; text-align: center; border-bottom: 2px solid #e5e7eb;">
+            <div style="display: inline-block; margin: 0 15px;"><div style="font-size: 32px; font-weight: bold; color: #8b5cf6;">${score}</div><div style="color: #6b7280; font-size: 13px;">${currentLang === 'ar' ? 'الدرجة الكلية' : 'Total Score'}</div></div>
+            <div style="display: inline-block; margin: 0 15px;"><div style="font-size: 32px; font-weight: bold; color: #10b981;">${successRate}%</div><div style="color: #6b7280; font-size: 13px;">${currentLang === 'ar' ? 'نسبة النجاح' : 'Success Rate'}</div></div>
+        </div>
+        <h3 style="background: #f3f4f6; padding: 12px; margin: 0; color: #1f2937; border-bottom: 2px solid #d1d5db;">📝 ${currentLang === 'ar' ? 'تفاصيل الإجابات' : 'Answer Details'}</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead><tr style="background: #8b5cf6; color: white;">
+                <th style="padding: 10px; border: 1px solid #7c3aed; width: 8%;">#</th>
+                <th style="padding: 10px; border: 1px solid #7c3aed; width: 32%;">${currentLang === 'ar' ? 'القسم' : 'Section'}</th>
+                <th style="padding: 10px; border: 1px solid #7c3aed; width: 15%;">${currentLang === 'ar' ? 'إجابة الطالب' : 'Student Answer'}</th>
+                <th style="padding: 10px; border: 1px solid #7c3aed; width: 15%;">${currentLang === 'ar' ? 'الصحيحة' : 'Correct'}</th>
+                <th style="padding: 10px; border: 1px solid #7c3aed; width: 15%;">${currentLang === 'ar' ? 'النتيجة' : 'Status'}</th>
+            </tr></thead><tbody>`;
+
+    let secScoresEmail = [0, 0, 0, 0, 0];
+    for (let i = 0; i < 50; i++) {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        const selectedValue = selected ? selected.value.toUpperCase() : '-';
+        const correctValue = correctAnswersMap[i].toUpperCase();
+        const isCorrect = selectedValue === correctValue;
+        const sectionIndex = Math.floor(i / 10);
+        if (isCorrect) secScoresEmail[sectionIndex]++;
+
+        const rowBg = i % 2 === 0 ? '#f9fafb' : '#ffffff';
+        const statusBg = isCorrect ? '#dcfce7' : '#fee2e2';
+        const statusColor = isCorrect ? '#166534' : '#991b1b';
+        const statusIcon = isCorrect ? '✅' : '❌';
+        const statusText = isCorrect ? (currentLang === 'ar' ? 'صحيح' : 'Correct') : (currentLang === 'ar' ? 'خطأ' : 'Wrong');
+
+        answersHTML += `<tr style="background: ${rowBg};">
+            <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: center; font-weight: bold;">${i + 1}</td>
+            <td style="padding: 8px; border: 1px solid #e5e7eb;">${currentSectionNames[sectionIndex]}</td>
+            <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: center; font-weight: bold;">${selectedValue}</td>
+            <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: center; font-weight: bold; color: #059669;">${correctValue}</td>
+            <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: center; background: ${statusBg}; color: ${statusColor}; font-weight: bold;">${statusIcon} ${statusText}</td>
+        </tr>`;
+    }
+
+    answersHTML += `</tbody></table>
+        <h3 style="background: #f3f4f6; padding: 12px; margin: 0; color: #1f2937; border-bottom: 2px solid #d1d5db; border-top: 3px solid #8b5cf6;">📊 ${currentLang === 'ar' ? 'تفصيل الأداء' : 'Performance Breakdown'}</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead><tr style="background: #7c3aed; color: white;">
+                <th style="padding: 10px; border: 1px solid #6d28d9;">${currentLang === 'ar' ? 'القسم' : 'Section'}</th>
+                <th style="padding: 10px; border: 1px solid #6d28d9; width: 20%;">${currentLang === 'ar' ? 'النتيجة' : 'Score'}</th>
+                <th style="padding: 10px; border: 1px solid #6d28d9; width: 20%;">${currentLang === 'ar' ? 'النسبة' : 'Percentage'}</th>
+            </tr></thead><tbody>`;
+
+    for (let i = 0; i < 5; i++) {
+        const percentage = Math.round((secScoresEmail[i] / 10) * 100);
+        const barColor = percentage >= 75 ? '#10b981' : percentage >= 50 ? '#f59e0b' : '#ef4444';
+        const rowBg = i % 2 === 0 ? '#f9fafb' : '#ffffff';
+        answersHTML += `<tr style="background: ${rowBg};">
+            <td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: 600;">${currentSectionNames[i]}</td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: bold; color: #8b5cf6;">${secScoresEmail[i]} / 10</td>
+            <td style="padding: 10px; border: 1px solid #e5e7eb;">
+                <div style="background: #e5e7eb; border-radius: 10px; overflow: hidden; height: 20px; position: relative;">
+                    <div style="background: ${barColor}; width: ${percentage}%; height: 100%;"></div>
+                    <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: bold; color: #1f2937;">${percentage}%</span>
+                </div>
+            </td>
+        </tr>`;
+    }
+
+    answersHTML += `</tbody></table>
+        <div style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 15px; border-radius: 0 0 10px 10px; border-top: 2px solid #f59e0b;">
+            <p style="margin: 0; color: #78350f; text-align: center; font-size: 13px;">💡 <strong>${currentLang === 'ar' ? 'ملاحظة:' : 'Note:'}</strong> ${currentLang === 'ar' ? 'تم إرسال هذا التقرير تلقائياً من منصة 4U التعليمية | Mr. Mohammed Hesham' : 'This report was automatically sent from 4U Educational Platform | Mr. Mohammed Hesham'}</p>
+        </div></div>`;
+
+    const templateParams = {
+        to_email: TARGET_EMAIL,
+        student_name: name,
+        student_class: studentClass,
+        exam_date: date,
+        total_score: score,
+        success_rate: successRate,
+        grade: badge,
+        answers_table: answersHTML
+    };
+
+    emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
+        .then(() => {
+            status.textContent = currentLang === 'ar' ? '✅ تم إرسال النتائج بنجاح!' : '✅ Results sent successfully!';
+            status.style.color = '#059669';
+            btn.textContent = currentLang === 'ar' ? '✓ تم الإرسال' : '✓ Sent';
+        })
+        .catch(err => {
+            status.textContent = currentLang === 'ar' ? '❌ فشل الإرسال، تحقق من الاتصال أو إعدادات EmailJS' : '❌ Failed to send, check connection or EmailJS settings';
+            status.style.color = '#dc2626';
+            btn.disabled = false;
+            btn.textContent = currentLang === 'ar' ? '📧 إعادة المحاولة' : '📧 Retry Send';
+            console.error('EmailJS Error:', err);
+        });
+}
+
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('examDate').valueAsDate = new Date();
+    prepareShuffledExam();
+    renderExam();
+    startTimer();
+});
+</script>
+</body>
+</html>
